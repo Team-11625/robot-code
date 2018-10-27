@@ -1,34 +1,3 @@
-/* Copyright (c) 2014 Qualcomm Technologies Inc
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted (subject to the limitations in the disclaimer below) provided that
-the following conditions are met:
-
-Redistributions of source code must retain the above copyright notice, this list
-of conditions and the following disclaimer.
-
-Redistributions in binary form must reproduce the above copyright notice, this
-list of conditions and the following disclaimer in the documentation and/or
-other materials provided with the distribution.
-
-Neither the name of Qualcomm Technologies Inc nor the names of its contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
-LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -41,8 +10,8 @@ import com.qualcomm.robotcore.util.Range;
  * <p>
  * Enables control of the robot via the gamepad
  */
-@TeleOp(name="TankDrive	", group="Test")  // @Autonomous(...) is the other common choice
-//@Disabled
+@TeleOp(name="TankDrive	", group="Test")
+
 public class TankDrive extends OpMode {
 
 	private DcMotor leftfrontDrive = null;
@@ -50,41 +19,20 @@ public class TankDrive extends OpMode {
 	private DcMotor leftbackDrive = null;
 	private DcMotor rightbackDrive = null;
 
+	private DcMotor arm = null; //the arm that captures the blocks and balls, controlled by left hand motor
+	private DcMotor armActivator = null;
+
 	boolean bDebug = false;
 
-	/**
-	 * Constructor
-	 */
-	public TankDrive() {
-
-	}
-
-	/*
-	 * Code to run when the op mode is first enabled goes here
-	 * 
-	 * @see com.qualcomm.robotcore.eventloop.opmode.OpMode#start()
-	 */
 	@Override
 	public void init() {
-		/*
-		 * Use the hardwareMap to get the dc motors and servos by name. Note
-		 * that the names of the devices must match the names used when you
-		 * configured your robot and created the configuration file.
-		 */
-		
-		/*
-		 * For this test, we assume the following,
-		 *   There are four motors
-		 *   "fl" and "bl" are front and back left wheels
-		 *   "fr" and "br" are front and back right wheels
-		 */
+
 		try {
 			leftfrontDrive = hardwareMap.get(DcMotor.class, "frontLeft");
 			leftfrontDrive.setDirection(DcMotor.Direction.REVERSE);
 			leftfrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 			rightfrontDrive = hardwareMap.get(DcMotor.class, "frontRight");
-			rightfrontDrive.setDirection(DcMotor.Direction.REVERSE);
 			rightfrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 			leftbackDrive = hardwareMap.get(DcMotor.class, "backLeft");
@@ -93,6 +41,13 @@ public class TankDrive extends OpMode {
 
 			rightbackDrive = hardwareMap.get(DcMotor.class, "backRight");
 			rightbackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+			rightbackDrive.setDirection(DcMotor.Direction.REVERSE);
+
+			arm = hardwareMap.get(DcMotor.class, "arm");
+			//arm.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+			armActivator = hardwareMap.get(DcMotor.class, "armActivator");
+			//armActivator.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 		}
 		catch (IllegalArgumentException iax) {
 			bDebug = true;
@@ -101,7 +56,7 @@ public class TankDrive extends OpMode {
 
 	/*
 	 * This method will be called repeatedly in a loop
-	 * 
+	 *
 	 * @see com.qualcomm.robotcore.eventloop.opmode.OpMode#run()
 	 */
 	@Override
@@ -111,6 +66,23 @@ public class TankDrive extends OpMode {
 		// note that if y equal -1 then joystick is pushed all of the way forward.
 		float left = -gamepad1.left_stick_y;
 		float right = -gamepad1.right_stick_y;
+		float rightTrigger1 = gamepad1.right_trigger;
+		float leftTrigger1 = gamepad1.left_trigger;
+		boolean leftBumper1 = gamepad1.left_bumper;
+		boolean rightBumper1 = gamepad1.right_bumper;
+
+		float rightTrigger2 = gamepad2.right_trigger;  //Second Controller
+		float leftTrigger2 = gamepad2.left_trigger;
+		boolean leftBumper2 = gamepad2.left_bumper;
+		boolean rightBumper2 = gamepad2.right_bumper;
+
+		boolean aButton = gamepad1.a;
+		boolean bButton = gamepad1.b;
+		boolean firstControllerAccessToArm = false;
+
+		String speed = "Max speed";
+
+		boolean aIsPressed = false;
 
 		// clip the right/left values so that the values never exceed +/- 1
 		left = Range.clip(left, -1, 1);
@@ -118,15 +90,85 @@ public class TankDrive extends OpMode {
 
 		// scale the joystick value to make it easier to control
 		// the robot more precisely at slower speeds.
-		left =  (float)scaleInput(left);
+		left = (float)scaleInput(left);
 		right = (float)scaleInput(right);
+
+		if(aButton == true && aIsPressed == false){
+			if(speed == "Max Speed"){
+				speed = "Quarter Speed";
+				aIsPressed = true;
+			}
+			else if(speed == "Quarter Speed"){
+				speed = "Half Speed";
+				aIsPressed = true;
+			}
+			else if(speed == "Half Speed"){
+				speed = "Max Speed";
+				aIsPressed = true;
+			}
+		}
+		else if(aButton == false && aIsPressed == true){
+			aIsPressed = false;
+		}
+
+		if(bButton == true && firstControllerAccessToArm == false){
+			firstControllerAccessToArm = true;
+		}
+		else if(bButton == true && firstControllerAccessToArm == true){
+			firstControllerAccessToArm = false;
+		}
 
 		// write the values to the motors - for now, front and back motors on each side are set the same
 		if (!bDebug) {
-			rightfrontDrive.setPower(right/2);
-			rightbackDrive.setPower(right/2);
-			leftfrontDrive.setPower(left/2);
-			leftbackDrive.setPower(left/2);
+
+			if(speed == "Max Speed") {
+				rightfrontDrive.setPower(right);
+				rightbackDrive.setPower(right);
+				leftfrontDrive.setPower(left);
+				leftbackDrive.setPower(left);
+			}
+			else if(speed == "Half Speed"){
+				rightfrontDrive.setPower(right/2);
+				rightbackDrive.setPower(right/2);
+				leftfrontDrive.setPower(left/2);
+				leftbackDrive.setPower(left/2);
+			}
+			else if(speed == "Quarter Speed"){
+				rightfrontDrive.setPower(right/4);
+				rightbackDrive.setPower(right/4);
+				leftfrontDrive.setPower(left/4);
+				leftbackDrive.setPower(left/4);
+			}
+
+			if(firstControllerAccessToArm == true) {
+
+				if (rightBumper1 == true && leftBumper1 == false) {
+					armActivator.setPower(.1);
+				} else if (leftBumper1 == true && rightBumper1 == false) {
+					armActivator.setPower(-.1);
+				}
+
+				if (leftTrigger1 == 0 && rightTrigger1 == 1) {
+					arm.setPower(1);
+				} else if (rightTrigger1 == 0 && leftTrigger1 == 1) {
+					arm.setPower(-1);
+				}
+			}
+
+			if(rightBumper2 == true && leftBumper2 == false){
+				armActivator.setPower(.1);
+			}
+
+			else if(leftBumper2 == true && rightBumper2 == false){
+				armActivator.setPower(-.1);
+			}
+
+			if(leftTrigger2 == 0 && rightTrigger2 == 1){
+				arm.setPower(1);
+			}
+			else if(rightTrigger2 == 0 && leftTrigger2 == 1){
+				arm.setPower(-1);
+			}
 		}
 
 		/*
@@ -135,7 +177,9 @@ public class TankDrive extends OpMode {
 		 * will return a null value. The legacy NXT-compatible motor controllers
 		 * are currently write only.
 		 */
-		telemetry.addData("Text", "*** Test v1.0 ***");
+
+		telemetry.addData("Speed: ", speed);
+		telemetry.addData("First Controller Access to arm: ", firstControllerAccessToArm);
 		telemetry.addData("left pwr", String.format("%.2f", left));
 		telemetry.addData("right pwr", String.format("%.2f", right));
 		telemetry.addData("gamepad1", gamepad1);
@@ -144,16 +188,16 @@ public class TankDrive extends OpMode {
 
 	/*
 	 * Code to run when the op mode is first disabled goes here
-	 * 
+	 *
 	 * @see com.qualcomm.robotcore.eventloop.opmode.OpMode#stop()
 	 */
 	@Override
 	public void stop() {
 
 	}
-	
+
 	/*
-	 * This method scales the joystick input so for low joystick values, the 
+	 * This method scales the joystick input so for low joystick values, the
 	 * scaled value is less than linear.  This is to make it easier to drive
 	 * the robot more precisely at slower speeds.
 	 */
